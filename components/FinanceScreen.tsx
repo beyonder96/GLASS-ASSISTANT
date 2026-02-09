@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, Plus, TrendingUp, TrendingDown, Filter, Trash2, ArrowUpRight, ArrowDownLeft, DollarSign, Wallet, Pencil, X, Save, AlertCircle, Sparkles, Loader2, BrainCircuit, Target, Lightbulb } from 'lucide-react';
-import { Transaction } from '../types';
+import { ChevronLeft, Plus, TrendingUp, TrendingDown, Filter, Trash2, ArrowUpRight, ArrowDownLeft, DollarSign, Wallet, Pencil, X, Save, AlertCircle, Sparkles, Loader2, BrainCircuit, Target, Lightbulb, CreditCard as CardIcon, Building2 } from 'lucide-react';
+import { Transaction, Account, CreditCard } from '../types';
 import { GlassCard } from './GlassCard';
 import { useData } from '../contexts/DataContext';
 
@@ -11,27 +10,76 @@ interface FinanceScreenProps {
 }
 
 export const FinanceScreen: React.FC<FinanceScreenProps> = ({ onBack }) => {
-    const { transactions, setTransactions, apePhases } = useData();
+    const { transactions, setTransactions, accounts, setAccounts, creditCards, setCreditCards, user } = useData();
     const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
     const [isFormOpen, setIsFormOpen] = useState(false);
+
+    // Account/Card Modal States
+    const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+    const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+
+    // Form States for Account/Card
+    const [accName, setAccName] = useState('');
+    const [accType, setAccType] = useState<Account['type']>('checking');
+    const [accBalance, setAccBalance] = useState('');
+
+    const [cardName, setCardName] = useState('');
+    const [cardLimit, setCardLimit] = useState('');
+    const [cardClosing, setCardClosing] = useState('');
+    const [cardDue, setCardDue] = useState('');
+
+    // Form states for Transaction
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [amount, setAmount] = useState('');
+    const [desc, setDesc] = useState('');
+    const [type, setType] = useState<'income' | 'expense'>('expense');
+    const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [selectedCardId, setSelectedCardId] = useState<string>('');
+
+    // Delete Modal State
+    const [deleteId, setDeleteId] = useState<string | null>(null);
 
     // Predictor States
     const [isPredicting, setIsPredicting] = useState(false);
     const [targetAmount, setTargetAmount] = useState('');
     const [prediction, setPrediction] = useState<{ verdict: 'SAFE' | 'WARNING' | 'DANGER', reasoning: string, impact: string, tip: string } | null>(null);
 
-    // Form states
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [amount, setAmount] = useState('');
-    const [desc, setDesc] = useState('');
-    const [type, setType] = useState<'income' | 'expense'>('expense');
+    const totalBalance = useMemo(() => {
+        // Balance is sum of all accounts
+        return accounts.reduce((acc, curr) => acc + curr.balance, 0);
+    }, [accounts]);
 
-    // Delete Modal State
-    const [deleteId, setDeleteId] = useState<string | null>(null);
-
-    const totalBalance = useMemo(() => transactions.reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0), [transactions]);
     const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
     const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+
+    const handleSaveAccount = () => {
+        if (!accName) return;
+        const newAcc: Account = {
+            id: Date.now().toString(),
+            name: accName,
+            type: accType,
+            balance: parseFloat(accBalance) || 0,
+            color: 'bg-indigo-500' // Default
+        };
+        setAccounts([...accounts, newAcc]);
+        setIsAccountModalOpen(false);
+        setAccName(''); setAccBalance('');
+    };
+
+    const handleSaveCard = () => {
+        if (!cardName) return;
+        const newCard: CreditCard = {
+            id: Date.now().toString(),
+            name: cardName,
+            limit: parseFloat(cardLimit) || 0,
+            closingDay: parseInt(cardClosing) || 1,
+            dueDay: parseInt(cardDue) || 10,
+            color: 'bg-indigo-600'
+        };
+        setCreditCards([...creditCards, newCard]);
+        setIsCardModalOpen(false);
+        setCardName(''); setCardLimit(''); setCardClosing(''); setCardDue('');
+    };
 
 
     const handlePredict = () => {
@@ -72,17 +120,42 @@ export const FinanceScreen: React.FC<FinanceScreenProps> = ({ onBack }) => {
 
     const handleSave = () => {
         if (!amount || !desc) return;
+
+        const txAmount = parseFloat(amount);
+
         if (editingId) {
-            setTransactions(transactions.map(t => t.id === editingId ? { ...t, type, amount: parseFloat(amount), description: desc } : t));
+            setTransactions(transactions.map(t => t.id === editingId ? {
+                ...t, type, amount: txAmount, description: desc,
+                accountId: selectedAccountId || undefined,
+                cardId: selectedCardId || undefined
+            } : t));
             setEditingId(null);
         } else {
-            const newTx: Transaction = { id: Date.now().toString(), type: type, amount: parseFloat(amount), description: desc, date: new Date().toISOString() };
+            const newTx: Transaction = {
+                id: Date.now().toString(),
+                type: type,
+                amount: txAmount,
+                description: desc,
+                date: new Date().toISOString(),
+                accountId: selectedAccountId || undefined,
+                cardId: selectedCardId || undefined
+            };
             setTransactions([newTx, ...transactions]);
+
+            // Update Account Balance if linked (simple logic for MVP)
+            if (selectedAccountId) {
+                setAccounts(accounts.map(a => {
+                    if (a.id === selectedAccountId) {
+                        return { ...a, balance: type === 'income' ? a.balance + txAmount : a.balance - txAmount };
+                    }
+                    return a;
+                }));
+            }
         }
         resetForm();
     };
 
-    const resetForm = () => { setIsFormOpen(false); setEditingId(null); setAmount(''); setDesc(''); setType('expense'); };
+    const resetForm = () => { setIsFormOpen(false); setEditingId(null); setAmount(''); setDesc(''); setType('expense'); setSelectedAccountId(''); setSelectedCardId(''); };
 
     const filteredTransactions = transactions.filter(t => filter === 'all' ? true : t.type === filter);
 
@@ -115,6 +188,54 @@ export const FinanceScreen: React.FC<FinanceScreenProps> = ({ onBack }) => {
                 <div>
                     <h2 className="text-2xl font-black text-slate-800 tracking-tight">Finanças</h2>
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sincronizado com Aura</p>
+                </div>
+            </div>
+
+            {/* Wallets & Cards Section */}
+            <div className="mb-6 px-1">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Minhas Contas</h3>
+                    <div className="flex gap-2">
+                        <button onClick={() => setIsAccountModalOpen(true)} className="text-[10px] font-bold bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg">+ CONTA</button>
+                        <button onClick={() => setIsCardModalOpen(true)} className="text-[10px] font-bold bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg">+ CARTÃO</button>
+                    </div>
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                    {/* Add Account Card Placeholder if empty */}
+                    {accounts.length === 0 && creditCards.length === 0 && (
+                        <div className="min-w-[200px] h-32 rounded-2xl bg-white/30 border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400">
+                            <Wallet size={24} className="mb-2" />
+                            <p className="text-xs font-bold uppercase">Nenhuma conta</p>
+                        </div>
+                    )}
+
+                    {accounts.map(acc => (
+                        <div key={acc.id} className="min-w-[220px] p-5 rounded-2xl bg-slate-900 text-white shadow-lg relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><Building2 size={60} /></div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{acc.type}</p>
+                            <p className="font-bold text-lg mb-4">{acc.name}</p>
+                            <p className="text-2xl font-black tracking-tight">R$ {acc.balance.toFixed(2)}</p>
+                        </div>
+                    ))}
+
+                    {creditCards.map(card => (
+                        <div key={card.id} className="min-w-[220px] p-5 rounded-2xl bg-indigo-600 text-white shadow-lg relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-125 transition-transform"><CardIcon size={60} /></div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Cartão de Crédito</p>
+                            <p className="font-bold text-lg mb-4">{card.name}</p>
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <p className="text-[9px] font-bold uppercase opacity-60">Limite</p>
+                                    <p className="text-lg font-black tracking-tight">R$ {card.limit.toFixed(2)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[9px] font-bold uppercase opacity-60">Fecha dia</p>
+                                    <p className="text-sm font-black">{card.closingDay}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -265,6 +386,29 @@ export const FinanceScreen: React.FC<FinanceScreenProps> = ({ onBack }) => {
                                 onChange={e => setDesc(e.target.value)}
                                 className="w-full p-4 rounded-2xl bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10"
                             />
+
+                            {/* Account/Card Selection */}
+                            <div className="flex gap-2">
+                                <select
+                                    value={selectedAccountId}
+                                    onChange={e => { setSelectedAccountId(e.target.value); setSelectedCardId(''); }}
+                                    className="flex-1 p-3 rounded-xl bg-slate-50 font-bold text-xs outline-none"
+                                    disabled={!!selectedCardId}
+                                >
+                                    <option value="">Sem Conta</option>
+                                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                </select>
+                                <select
+                                    value={selectedCardId}
+                                    onChange={e => { setSelectedCardId(e.target.value); setSelectedAccountId(''); setType('expense'); }}
+                                    className="flex-1 p-3 rounded-xl bg-slate-50 font-bold text-xs outline-none"
+                                    disabled={!!selectedAccountId || type === 'income'}
+                                >
+                                    <option value="">Sem Cartão</option>
+                                    {creditCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+
                             <button onClick={handleSave} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl active:scale-[0.98] flex items-center justify-center gap-2">
                                 <Save size={16} /> Salvar Lançamento
                             </button>
@@ -303,6 +447,55 @@ export const FinanceScreen: React.FC<FinanceScreenProps> = ({ onBack }) => {
                 )}
             </div>
 
-        </div>
+
+
+            {/* Account Modal */}
+            {
+                isAccountModalOpen && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+                        <GlassCard className="w-full max-w-sm" padding="p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-800">Nova Conta</h3>
+                                <button onClick={() => setIsAccountModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                            </div>
+                            <div className="space-y-3">
+                                <input type="text" placeholder="Nome da Conta (Nubank, Cofre...)" value={accName} onChange={e => setAccName(e.target.value)} className="w-full p-3 rounded-xl bg-white/50 border border-white/60 text-sm font-bold outline-none" />
+                                <select value={accType} onChange={e => setAccType(e.target.value as any)} className="w-full p-3 rounded-xl bg-white/50 border border-white/60 text-sm font-bold outline-none">
+                                    <option value="checking">Conta Corrente</option>
+                                    <option value="savings">Poupança</option>
+                                    <option value="investment">Investimento</option>
+                                    <option value="cash">Dinheiro Físico</option>
+                                </select>
+                                <input type="number" placeholder="Saldo Atual (R$)" value={accBalance} onChange={e => setAccBalance(e.target.value)} className="w-full p-3 rounded-xl bg-white/50 border border-white/60 text-sm font-bold outline-none" />
+                                <button onClick={handleSaveAccount} className="w-full p-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg mt-2">Salvar Conta</button>
+                            </div>
+                        </GlassCard>
+                    </div>
+                )
+            }
+
+            {/* Card Modal */}
+            {
+                isCardModalOpen && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+                        <GlassCard className="w-full max-w-sm" padding="p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-800">Novo Cartão</h3>
+                                <button onClick={() => setIsCardModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+                            </div>
+                            <div className="space-y-3">
+                                <input type="text" placeholder="Nome do Cartão" value={cardName} onChange={e => setCardName(e.target.value)} className="w-full p-3 rounded-xl bg-white/50 border border-white/60 text-sm font-bold outline-none" />
+                                <input type="number" placeholder="Limite (R$)" value={cardLimit} onChange={e => setCardLimit(e.target.value)} className="w-full p-3 rounded-xl bg-white/50 border border-white/60 text-sm font-bold outline-none" />
+                                <div className="flex gap-2">
+                                    <input type="number" placeholder="Dia Fech." value={cardClosing} onChange={e => setCardClosing(e.target.value)} className="flex-1 p-3 rounded-xl bg-white/50 border border-white/60 text-sm font-bold outline-none" />
+                                    <input type="number" placeholder="Dia Venc." value={cardDue} onChange={e => setCardDue(e.target.value)} className="flex-1 p-3 rounded-xl bg-white/50 border border-white/60 text-sm font-bold outline-none" />
+                                </div>
+                                <button onClick={handleSaveCard} className="w-full p-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg mt-2">Salvar Cartão</button>
+                            </div>
+                        </GlassCard>
+                    </div>
+                )
+            }
+        </div >
     );
 };

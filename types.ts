@@ -22,6 +22,7 @@ export interface Task {
   id: string;
   title: string;
   completed: boolean;
+  notes?: string;
 }
 
 export interface ShoppingItem {
@@ -45,12 +46,32 @@ export interface AppMemory {
   category: 'personal' | 'preference' | 'important';
 }
 
+export interface Account {
+  id: string;
+  name: string;
+  type: 'checking' | 'savings' | 'investment' | 'cash' | 'other';
+  balance: number;
+  color?: string;
+}
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  limit: number;
+  closingDay: number;
+  dueDay: number;
+  color?: string;
+}
+
 export interface Transaction {
   id: string;
   type: 'income' | 'expense';
   amount: number;
   description: string;
   date: string;
+  accountId?: string;
+  cardId?: string;
+  category?: string;
 }
 
 export interface Vaccine {

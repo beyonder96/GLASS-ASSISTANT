@@ -94,6 +94,7 @@ export const PetScreen: React.FC<PetScreenProps> = ({ onBack }) => {
   const handleSaveWeight = () => {
     if (!weightVal || !weightDate || !selectedPetId) return;
     const newEntry: WeightEntry = {
+      id: Date.now().toString(),
       date: weightDate,
       weight: parseFloat(weightVal)
     };

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Task, Transaction, ShoppingItem, Pet, ConstructionPhase, ApeNote, WidgetLayoutItem, AppMemory } from '../types';
+import { Task, Transaction, ShoppingItem, Pet, ConstructionPhase, ApeNote, WidgetLayoutItem, AppMemory, Account, CreditCard } from '../types';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
 
@@ -21,6 +21,10 @@ interface DataContextType {
   setApePhases: React.Dispatch<React.SetStateAction<ConstructionPhase[]>>;
   apeNotes: ApeNote[];
   setApeNotes: React.Dispatch<React.SetStateAction<ApeNote[]>>;
+  accounts: Account[];
+  setAccounts: React.Dispatch<React.SetStateAction<Account[]>>;
+  creditCards: CreditCard[];
+  setCreditCards: React.Dispatch<React.SetStateAction<CreditCard[]>>;
   dashboardLayout: WidgetLayoutItem[];
   setDashboardLayout: React.Dispatch<React.SetStateAction<WidgetLayoutItem[]>>;
   memory: AppMemory[];
@@ -51,6 +55,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [pets, setPetsState] = useState<Pet[]>([]);
   const [apePhases, setApePhasesState] = useState<ConstructionPhase[]>([]);
   const [apeNotes, setApeNotesState] = useState<ApeNote[]>([]);
+  const [accounts, setAccountsState] = useState<Account[]>([]);
+  const [creditCards, setCreditCardsState] = useState<CreditCard[]>([]);
   const [dashboardLayout, setDashboardLayoutState] = useState<WidgetLayoutItem[]>([]);
   const [memory, setMemoryState] = useState<AppMemory[]>([]);
   const [currentWeather, setCurrentWeather] = useState<WeatherState>('default');
@@ -67,6 +73,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedPets = localStorage.getItem('glass_pets');
       const savedApePhases = localStorage.getItem('ape_phases');
       const savedApeNotes = localStorage.getItem('ape_notes');
+      const savedAccounts = localStorage.getItem('glass_accounts');
+      const savedCreditCards = localStorage.getItem('glass_credit_cards');
       const savedLayout = localStorage.getItem('glass_dashboard_layout');
       const savedMemory = localStorage.getItem('glass_memory');
 
@@ -76,6 +84,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (savedPets) setPetsState(JSON.parse(savedPets));
       if (savedApePhases) setApePhasesState(JSON.parse(savedApePhases));
       if (savedApeNotes) setApeNotesState(JSON.parse(savedApeNotes));
+      if (savedAccounts) setAccountsState(JSON.parse(savedAccounts));
+      if (savedCreditCards) setCreditCardsState(JSON.parse(savedCreditCards));
 
       if (savedLayout) {
         setDashboardLayoutState(JSON.parse(savedLayout));
@@ -112,11 +122,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Fetch Tasks
       const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
-      if (tasksData && tasksData.length > 0) setTasksState(tasksData.map(t => ({ id: t.id, title: t.text, completed: t.completed })));
+      if (tasksData && tasksData.length > 0) setTasksState(tasksData.map(t => ({ id: t.id, title: t.text, completed: t.completed, notes: t.notes })));
 
       // Fetch Transactions
       const { data: txData } = await supabase.from('transactions').select('*').eq('user_id', userId);
-      if (txData && txData.length > 0) setTransactionsState(txData.map(t => ({ id: t.id, description: t.description, amount: Number(t.amount), type: t.type as 'income' | 'expense', date: t.date })));
+      if (txData && txData.length > 0) setTransactionsState(txData.map(t => ({ id: t.id, description: t.description, amount: Number(t.amount), type: t.type as 'income' | 'expense', date: t.date, accountId: t.account_id, cardId: t.card_id, category: t.category })));
 
       // Fetch Shopping
       const { data: shopData } = await supabase.from('shopping_items').select('*').eq('user_id', userId);
@@ -134,6 +144,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         weightHistory: typeof p.weight_history === 'string' ? JSON.parse(p.weight_history) : p.weight_history,
         vaccines: typeof p.vaccines === 'string' ? JSON.parse(p.vaccines) : p.vaccines
       })));
+
+      // Fetch Accounts
+      const { data: accData } = await supabase.from('accounts').select('*').eq('user_id', userId);
+      if (accData && accData.length > 0) setAccountsState(accData.map(a => ({ id: a.id, name: a.name, type: a.type as any, balance: Number(a.balance), color: a.color })));
+
+      // Fetch Credit Cards
+      const { data: ccData } = await supabase.from('credit_cards').select('*').eq('user_id', userId);
+      if (ccData && ccData.length > 0) setCreditCardsState(ccData.map(c => ({ id: c.id, name: c.name, limit: Number(c.limit_amount), closingDay: c.closing_day, dueDay: c.due_day, color: c.color })));
 
       setSyncStatus('synced');
     } catch (error) {
@@ -156,6 +174,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('glass_pets', JSON.stringify(pets));
       localStorage.setItem('ape_phases', JSON.stringify(apePhases));
       localStorage.setItem('ape_notes', JSON.stringify(apeNotes));
+      localStorage.setItem('glass_accounts', JSON.stringify(accounts));
+      localStorage.setItem('glass_credit_cards', JSON.stringify(creditCards));
       localStorage.setItem('glass_dashboard_layout', JSON.stringify(dashboardLayout));
       localStorage.setItem('glass_memory', JSON.stringify(memory));
 
@@ -168,7 +188,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }, 2000); // 2s debounce
       }
     }
-  }, [tasks, transactions, shoppingList, pets, apePhases, apeNotes, dashboardLayout, memory, isLoaded, user]);
+  }, [tasks, transactions, shoppingList, pets, apePhases, apeNotes, accounts, creditCards, dashboardLayout, memory, isLoaded, user]);
 
   const saveToSupabase = async () => {
     if (!user) return;
@@ -179,7 +199,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await supabase.from('tasks').insert(tasks.map(t => ({
           user_id: user.id,
           text: t.title,
-          completed: t.completed
+          completed: t.completed,
+          notes: t.notes
           // id is auto-generated or we can preserve it if uuid? 
           // schema says id uuid default gen_random_uuid().
           // If we want to preserve local IDs (which are Date.now().toString()), we need to change schema or just let Supabase generate new ones.
@@ -207,7 +228,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           description: t.description,
           amount: t.amount,
           type: t.type,
-          date: t.date
+          type: t.type,
+          date: t.date,
+          account_id: t.accountId,
+          card_id: t.cardId,
+          category: t.category
         })));
       }
 
@@ -227,6 +252,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })));
       }
 
+      // Sync Accounts
+      await supabase.from('accounts').delete().eq('user_id', user.id);
+      if (accounts.length > 0) {
+        await supabase.from('accounts').insert(accounts.map(a => ({
+          user_id: user.id,
+          name: a.name,
+          type: a.type,
+          balance: a.balance,
+          color: a.color
+        })));
+      }
+
+      // Sync Credit Cards
+      await supabase.from('credit_cards').delete().eq('user_id', user.id);
+      if (creditCards.length > 0) {
+        await supabase.from('credit_cards').insert(creditCards.map(c => ({
+          user_id: user.id,
+          name: c.name,
+          limit_amount: c.limit,
+          closing_day: c.closingDay,
+          due_day: c.dueDay,
+          color: c.color
+        })));
+      }
+
       setSyncStatus('synced');
     } catch (e) {
       console.error("Erro no sync Supabase:", e);
@@ -243,6 +293,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       pets, setPets: setPetsState,
       apePhases, setApePhases: setApePhasesState,
       apeNotes, setApeNotes: setApeNotesState,
+      accounts, setAccounts: setAccountsState,
+      creditCards, setCreditCards: setCreditCardsState,
       dashboardLayout, setDashboardLayout: setDashboardLayoutState,
       memory, setMemory: setMemoryState,
       currentWeather, setCurrentWeather,

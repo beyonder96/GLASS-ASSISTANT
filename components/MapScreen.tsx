@@ -85,7 +85,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({ onBack, initialQuery }) =>
       // Calculate a simple bounding box (approx 50km ~ 0.5 deg)
       const lat = activeLoc[0];
       const lon = activeLoc[1];
-      const delta = 0.5; // ~50km box
+      const delta = 0.05; // ~5km box
       const viewbox = `${lon - delta},${lat + delta},${lon + delta},${lat - delta}`; // left,top,right,bottom
 
       // Helper to map generic terms to specific POIs to avoid city/neighborhood matches
