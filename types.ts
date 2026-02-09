@@ -63,15 +63,27 @@ export interface CreditCard {
   color?: string;
 }
 
+export interface Budget {
+  id: string;
+  category: string;
+  amount: number;
+  spent: number;
+}
+
 export interface Transaction {
   id: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   amount: number;
   description: string;
   date: string;
   accountId?: string;
   cardId?: string;
   category?: string;
+  destinationAccountId?: string;
+  recurrence?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    status: 'active' | 'paused';
+  };
 }
 
 export interface Vaccine {
@@ -92,7 +104,7 @@ export interface Pet {
   name: string;
   type: 'dog' | 'cat' | 'bird' | 'other';
   breed?: string;
-  birthDate?: string; 
+  birthDate?: string;
   microchip?: string;
   weightHistory?: WeightEntry[];
   vaccines?: Vaccine[];

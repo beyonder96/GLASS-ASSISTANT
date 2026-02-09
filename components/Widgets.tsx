@@ -205,9 +205,12 @@ export const ApeWidget: React.FC<{ onClick: () => void }> = ({ onClick }) => {
 };
 
 export const FinanceWidget: React.FC<{ onClick?: () => void }> = ({ onClick }) => {
-    const { transactions } = useData();
+    const { transactions, accounts } = useData();
     const [isVisible, setIsVisible] = useState(false);
-    const balance = transactions.reduce((acc, curr) => curr.type === 'income' ? acc + curr.amount : acc - curr.amount, 0);
+
+    const balance = useMemo(() => {
+        return accounts.reduce((acc, curr) => acc + curr.balance, 0);
+    }, [accounts]);
 
     return (
         <GlassCard interactive={!!onClick} onClick={onClick} className="h-full flex flex-col justify-between border-white/40" padding="p-6">

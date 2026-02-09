@@ -1,14 +1,12 @@
-
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Task, Transaction, ShoppingItem, Pet, ConstructionPhase, ApeNote, WidgetLayoutItem, AppMemory, Account, CreditCard } from '../types';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { Task, Transaction, ShoppingItem, Pet, ConstructionPhase, ApeNote, WidgetLayoutItem, AppMemory, Account, CreditCard, Budget } from '../types';
 import { supabase } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
 
-// Define and export WeatherState as it is required by Widgets.tsx
 export type WeatherState = 'sunny' | 'cloudy' | 'rainy' | 'night' | 'default';
 
 interface DataContextType {
-  user: User | null; // Added User
+  user: User | null;
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   transactions: Transaction[];
@@ -27,11 +25,15 @@ interface DataContextType {
   setCreditCards: React.Dispatch<React.SetStateAction<CreditCard[]>>;
   dashboardLayout: WidgetLayoutItem[];
   setDashboardLayout: React.Dispatch<React.SetStateAction<WidgetLayoutItem[]>>;
+  budgets: Budget[];
+  setBudgets: React.Dispatch<React.SetStateAction<Budget[]>>;
   memory: AppMemory[];
   setMemory: React.Dispatch<React.SetStateAction<AppMemory[]>>;
   currentWeather: WeatherState;
   setCurrentWeather: React.Dispatch<React.SetStateAction<WeatherState>>;
-  syncStatus: 'synced' | 'syncing' | 'error' | 'offline'; // Added Sync Status
+  syncStatus: 'synced' | 'syncing' | 'error' | 'offline';
+  profileImage: string | null;
+  setProfileImage: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -45,10 +47,17 @@ const DEFAULT_LAYOUT: WidgetLayoutItem[] = [
   { id: 'w6', type: 'finance', colSpan: 1, isVisible: true }
 ];
 
+// Helper to check if string is a valid UUID
+const isUUID = (str: string) => {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return regex.test(str);
+};
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error' | 'offline'>('offline');
 
+  // State Definitions
   const [tasks, setTasksState] = useState<Task[]>([]);
   const [transactions, setTransactionsState] = useState<Transaction[]>([]);
   const [shoppingList, setShoppingListState] = useState<ShoppingItem[]>([]);
@@ -58,50 +67,47 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [accounts, setAccountsState] = useState<Account[]>([]);
   const [creditCards, setCreditCardsState] = useState<CreditCard[]>([]);
   const [dashboardLayout, setDashboardLayoutState] = useState<WidgetLayoutItem[]>([]);
+  const [budgets, setBudgetsState] = useState<Budget[]>([]);
   const [memory, setMemoryState] = useState<AppMemory[]>([]);
   const [currentWeather, setCurrentWeather] = useState<WeatherState>('default');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const isFirstRender = useRef(true);
 
-  // 1. Load from LocalStorage (Fallback/Cache)
+  // Refs to prevent sync loops
+  const isInitialLoad = useRef(true);
+
+  // 1. Load from LocalStorage (Initial)
   useEffect(() => {
     try {
-      const savedTasks = localStorage.getItem('glass_tasks');
-      const savedTxs = localStorage.getItem('glass_transactions');
-      const savedShop = localStorage.getItem('glass_shopping');
-      const savedPets = localStorage.getItem('glass_pets');
-      const savedApePhases = localStorage.getItem('ape_phases');
-      const savedApeNotes = localStorage.getItem('ape_notes');
-      const savedAccounts = localStorage.getItem('glass_accounts');
-      const savedCreditCards = localStorage.getItem('glass_credit_cards');
+      const load = (key: string, setter: any) => {
+        const saved = localStorage.getItem(key);
+        if (saved) setter(JSON.parse(saved));
+      };
+
+      load('glass_tasks', setTasksState);
+      load('glass_transactions', setTransactionsState);
+      load('glass_shopping', setShoppingListState);
+      load('glass_pets', setPetsState);
+      load('ape_phases', setApePhasesState);
+      load('ape_notes', setApeNotesState);
+      load('glass_accounts', setAccountsState);
+      load('glass_credit_cards', setCreditCardsState);
+      load('glass_budgets', setBudgetsState);
+      load('glass_memory', setMemoryState);
+      load('glass_profile_image', setProfileImage);
+
       const savedLayout = localStorage.getItem('glass_dashboard_layout');
-      const savedMemory = localStorage.getItem('glass_memory');
-
-      if (savedTasks) setTasksState(JSON.parse(savedTasks));
-      if (savedTxs) setTransactionsState(JSON.parse(savedTxs));
-      if (savedShop) setShoppingListState(JSON.parse(savedShop));
-      if (savedPets) setPetsState(JSON.parse(savedPets));
-      if (savedApePhases) setApePhasesState(JSON.parse(savedApePhases));
-      if (savedApeNotes) setApeNotesState(JSON.parse(savedApeNotes));
-      if (savedAccounts) setAccountsState(JSON.parse(savedAccounts));
-      if (savedCreditCards) setCreditCardsState(JSON.parse(savedCreditCards));
-
-      if (savedLayout) {
-        setDashboardLayoutState(JSON.parse(savedLayout));
-      } else {
-        setDashboardLayoutState(DEFAULT_LAYOUT);
-      }
-
-      if (savedMemory) setMemoryState(JSON.parse(savedMemory));
+      if (savedLayout) setDashboardLayoutState(JSON.parse(savedLayout));
+      else setDashboardLayoutState(DEFAULT_LAYOUT);
 
       setIsLoaded(true);
     } catch (e) {
-      console.error("Erro ao carregar dados locais", e);
+      console.error("Critical: Failed to load local data", e);
     }
   }, []);
 
-  // 2. Auth Listener & Fetch Remote Data
+  // 2. Auth & Remote Fetch
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -120,169 +126,136 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchRemoteData = async (userId: string) => {
     setSyncStatus('syncing');
     try {
-      // Fetch Tasks
-      const { data: tasksData } = await supabase.from('tasks').select('*').eq('user_id', userId);
-      if (tasksData && tasksData.length > 0) setTasksState(tasksData.map(t => ({ id: t.id, title: t.text, completed: t.completed, notes: t.notes })));
+      const fetchData = async (table: string, setter: any, mapper: (item: any) => any) => {
+        const { data } = await supabase.from(table).select('*').eq('user_id', userId);
+        if (data && data.length > 0) setter(data.map(mapper));
+      };
 
-      // Fetch Transactions
-      const { data: txData } = await supabase.from('transactions').select('*').eq('user_id', userId);
-      if (txData && txData.length > 0) setTransactionsState(txData.map(t => ({ id: t.id, description: t.description, amount: Number(t.amount), type: t.type as 'income' | 'expense', date: t.date, accountId: t.account_id, cardId: t.card_id, category: t.category })));
-
-      // Fetch Shopping
-      const { data: shopData } = await supabase.from('shopping_items').select('*').eq('user_id', userId);
-      if (shopData && shopData.length > 0) setShoppingListState(shopData.map(t => ({ id: t.id, name: t.text, completed: t.completed })));
-
-      // Fetch Pets
-      const { data: petsData } = await supabase.from('pets').select('*').eq('user_id', userId);
-      if (petsData && petsData.length > 0) setPetsState(petsData.map(p => ({
-        id: p.id,
-        name: p.name,
-        type: p.type as any,
-        breed: p.breed,
-        birthDate: p.birth_date, // Mapped
-        microchip: p.microchip,
-        weightHistory: typeof p.weight_history === 'string' ? JSON.parse(p.weight_history) : p.weight_history,
-        vaccines: typeof p.vaccines === 'string' ? JSON.parse(p.vaccines) : p.vaccines
-      })));
-
-      // Fetch Accounts
-      const { data: accData } = await supabase.from('accounts').select('*').eq('user_id', userId);
-      if (accData && accData.length > 0) setAccountsState(accData.map(a => ({ id: a.id, name: a.name, type: a.type as any, balance: Number(a.balance), color: a.color })));
-
-      // Fetch Credit Cards
-      const { data: ccData } = await supabase.from('credit_cards').select('*').eq('user_id', userId);
-      if (ccData && ccData.length > 0) setCreditCardsState(ccData.map(c => ({ id: c.id, name: c.name, limit: Number(c.limit_amount), closingDay: c.closing_day, dueDay: c.due_day, color: c.color })));
+      await Promise.all([
+        fetchData('tasks', setTasksState, t => ({ id: t.id, title: t.text, completed: t.completed, notes: t.notes })),
+        fetchData('shopping_items', setShoppingListState, s => ({ id: s.id, name: s.text, completed: s.completed })),
+        fetchData('accounts', setAccountsState, a => ({ id: a.id, name: a.name, type: a.type, balance: Number(a.balance), color: a.color })),
+        fetchData('credit_cards', setCreditCardsState, c => ({ id: c.id, name: c.name, limit: Number(c.limit_amount), closingDay: c.closing_day, dueDay: c.due_day, color: c.color })),
+        fetchData('pets', setPetsState, p => ({
+          id: p.id, name: p.name, type: p.type, breed: p.breed, birthDate: p.birth_date, microchip: p.microchip,
+          weightHistory: typeof p.weight_history === 'string' ? JSON.parse(p.weight_history) : p.weight_history,
+          vaccines: typeof p.vaccines === 'string' ? JSON.parse(p.vaccines) : p.vaccines
+        })),
+        fetchData('transactions', setTransactionsState, t => ({
+          id: t.id, description: t.description, amount: Number(t.amount), type: t.type, date: t.date, accountId: t.account_id, cardId: t.card_id, category: t.category
+        }))
+      ]);
 
       setSyncStatus('synced');
     } catch (error) {
-      console.error("Erro ao buscar dados remotos:", error);
+      console.error("Error fetching remote data:", error);
       setSyncStatus('error');
+    } finally {
+      isInitialLoad.current = false;
     }
   };
 
-  // 3. Sync Changes to Supabase (Debounced)
-  // Limitation: We wipe and recreate for simplicity/consistency in this MVP.
-  // Ideally, we'd use upsert.
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // --- GENERIC UPSERT HELPER ---
+  const upsertData = useCallback(async (table: string, data: any[]) => {
+    if (!user) return;
 
+    // Safety: If ID is not a valid UUID (it's a temp local ID), strip it so Supabase generates a new UUID.
+    // If it IS a UUID, we keep it to update the existing record.
+    const cleanPayload = data.map(item => {
+      const payload = { ...item, user_id: user.id };
+      if (payload.id && !isUUID(payload.id)) {
+        delete payload.id;
+      }
+      return payload;
+    });
+
+    if (cleanPayload.length === 0) return;
+
+    const { error } = await supabase.from(table).upsert(cleanPayload);
+    if (error) {
+      console.error(`Error syncing ${table}:`, error);
+      setSyncStatus('error');
+    } else {
+      setSyncStatus('synced');
+    }
+  }, [user]);
+
+  // --- SPLIT SYNC EFFECTS ---
+
+  // 1. Sync Tasks
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('glass_tasks', JSON.stringify(tasks));
+    if (user && !isInitialLoad.current) {
+      setSyncStatus('syncing');
+      const timer = setTimeout(() => {
+        upsertData('tasks', tasks.map(t => ({ id: t.id, text: t.title, completed: t.completed, notes: t.notes })));
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [tasks, isLoaded, user, upsertData]);
+
+  // 2. Sync Finance (Transactions, Accounts, Cards) - grouped because they relate
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('glass_transactions', JSON.stringify(transactions));
+    localStorage.setItem('glass_accounts', JSON.stringify(accounts));
+    localStorage.setItem('glass_credit_cards', JSON.stringify(creditCards));
+
+    if (user && !isInitialLoad.current) {
+      setSyncStatus('syncing');
+      const timer = setTimeout(() => {
+        // Sync Accounts
+        upsertData('accounts', accounts.map(a => ({ id: a.id, name: a.name, type: a.type, balance: a.balance, color: a.color })));
+        // Sync Cards
+        upsertData('credit_cards', creditCards.map(c => ({ id: c.id, name: c.name, limit_amount: c.limit, closing_day: c.closingDay, due_day: c.dueDay, color: c.color })));
+        // Sync Transactions
+        upsertData('transactions', transactions.map(t => ({ id: t.id, description: t.description, amount: t.amount, type: t.type, date: t.date, account_id: t.accountId, card_id: t.cardId, category: t.category })));
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [transactions, accounts, creditCards, isLoaded, user, upsertData]);
+
+  // 3. Sync Shopping
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('glass_shopping', JSON.stringify(shoppingList));
+    if (user && !isInitialLoad.current) {
+      setSyncStatus('syncing');
+      const timer = setTimeout(() => {
+        upsertData('shopping_items', shoppingList.map(s => ({ id: s.id, text: s.name, completed: s.completed })));
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [shoppingList, isLoaded, user, upsertData]);
+
+  // 4. Sync Pets
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('glass_pets', JSON.stringify(pets));
+    if (user && !isInitialLoad.current) {
+      setSyncStatus('syncing');
+      const timer = setTimeout(() => {
+        upsertData('pets', pets.map(p => ({
+          id: p.id, name: p.name, type: p.type, breed: p.breed, birth_date: p.birthDate, microchip: p.microchip,
+          weight_history: p.weightHistory, vaccines: p.vaccines
+        })));
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [pets, isLoaded, user, upsertData]);
+
+  // 5. Sync Others (Local Only or Less Frequent)
   useEffect(() => {
     if (isLoaded) {
-      // Always save to LocalStorage
-      localStorage.setItem('glass_tasks', JSON.stringify(tasks));
-      localStorage.setItem('glass_transactions', JSON.stringify(transactions));
-      localStorage.setItem('glass_shopping', JSON.stringify(shoppingList));
-      localStorage.setItem('glass_pets', JSON.stringify(pets));
       localStorage.setItem('ape_phases', JSON.stringify(apePhases));
       localStorage.setItem('ape_notes', JSON.stringify(apeNotes));
-      localStorage.setItem('glass_accounts', JSON.stringify(accounts));
-      localStorage.setItem('glass_credit_cards', JSON.stringify(creditCards));
       localStorage.setItem('glass_dashboard_layout', JSON.stringify(dashboardLayout));
+      localStorage.setItem('glass_budgets', JSON.stringify(budgets));
       localStorage.setItem('glass_memory', JSON.stringify(memory));
-
-      // If User Logged In, Sync to Supabase
-      if (user) {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        setSyncStatus('syncing');
-        timeoutRef.current = setTimeout(async () => {
-          saveToSupabase();
-        }, 2000); // 2s debounce
-      }
+      if (profileImage) localStorage.setItem('glass_profile_image', JSON.stringify(profileImage));
     }
-  }, [tasks, transactions, shoppingList, pets, apePhases, apeNotes, accounts, creditCards, dashboardLayout, memory, isLoaded, user]);
-
-  const saveToSupabase = async () => {
-    if (!user) return;
-    try {
-      // Sync Tasks (Delete all & Insert)
-      await supabase.from('tasks').delete().eq('user_id', user.id);
-      if (tasks.length > 0) {
-        await supabase.from('tasks').insert(tasks.map(t => ({
-          user_id: user.id,
-          text: t.title,
-          completed: t.completed,
-          notes: t.notes
-          // id is auto-generated or we can preserve it if uuid? 
-          // schema says id uuid default gen_random_uuid().
-          // If we want to preserve local IDs (which are Date.now().toString()), we need to change schema or just let Supabase generate new ones.
-          // Issue: If Supabase generates new IDs, our local IDs become invalid sync-wise.
-          // Fix: We should probably store the local ID? Or just trust the content?
-          // For MVP, we'll just insert content.
-        })));
-      }
-
-      // Sync Shopping
-      await supabase.from('shopping_items').delete().eq('user_id', user.id);
-      if (shoppingList.length > 0) {
-        await supabase.from('shopping_items').insert(shoppingList.map(t => ({
-          user_id: user.id,
-          text: t.name,
-          completed: t.completed
-        })));
-      }
-
-      // Sync Transactions
-      await supabase.from('transactions').delete().eq('user_id', user.id);
-      if (transactions.length > 0) {
-        await supabase.from('transactions').insert(transactions.map(t => ({
-          user_id: user.id,
-          description: t.description,
-          amount: t.amount,
-          type: t.type,
-          type: t.type,
-          date: t.date,
-          account_id: t.accountId,
-          card_id: t.cardId,
-          category: t.category
-        })));
-      }
-
-      // Sync Pets
-      // We do Upsert here because Pets are more complex? No, Delete/Insert is safer for Consistency if lists are small.
-      await supabase.from('pets').delete().eq('user_id', user.id);
-      if (pets.length > 0) {
-        await supabase.from('pets').insert(pets.map(p => ({
-          user_id: user.id,
-          name: p.name,
-          type: p.type,
-          breed: p.breed,
-          birth_date: p.birthDate,
-          microchip: p.microchip,
-          weight_history: p.weightHistory, // JSONB
-          vaccines: p.vaccines // JSONB
-        })));
-      }
-
-      // Sync Accounts
-      await supabase.from('accounts').delete().eq('user_id', user.id);
-      if (accounts.length > 0) {
-        await supabase.from('accounts').insert(accounts.map(a => ({
-          user_id: user.id,
-          name: a.name,
-          type: a.type,
-          balance: a.balance,
-          color: a.color
-        })));
-      }
-
-      // Sync Credit Cards
-      await supabase.from('credit_cards').delete().eq('user_id', user.id);
-      if (creditCards.length > 0) {
-        await supabase.from('credit_cards').insert(creditCards.map(c => ({
-          user_id: user.id,
-          name: c.name,
-          limit_amount: c.limit,
-          closing_day: c.closingDay,
-          due_day: c.dueDay,
-          color: c.color
-        })));
-      }
-
-      setSyncStatus('synced');
-    } catch (e) {
-      console.error("Erro no sync Supabase:", e);
-      setSyncStatus('error');
-    }
-  };
+  }, [apePhases, apeNotes, dashboardLayout, memory, profileImage, isLoaded]);
 
   return (
     <DataContext.Provider value={{
@@ -296,8 +269,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       accounts, setAccounts: setAccountsState,
       creditCards, setCreditCards: setCreditCardsState,
       dashboardLayout, setDashboardLayout: setDashboardLayoutState,
+      budgets, setBudgets: setBudgetsState,
       memory, setMemory: setMemoryState,
       currentWeather, setCurrentWeather,
+      profileImage, setProfileImage,
       syncStatus
     }}>
       {children}
