@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { ChevronLeft, Plus, Trash2, PawPrint, Dog, Cat, Bird, Save, X, Heart, Pencil, Syringe, Scale, Calendar, ArrowRight, TrendingUp } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { Pet, Vaccine, WeightEntry } from '../types';
 import { GlassCard } from './GlassCard';
 import { useData } from '../contexts/DataContext';
@@ -82,8 +83,9 @@ export const PetScreen: React.FC<PetScreenProps> = ({ onBack }) => {
   const handleSaveVaccine = () => {
     if (!vacName || !vacDate || !selectedPetId) return;
     const newVac: Vaccine = {
+      id: uuidv4(),
       name: vacName,
-      date: vacDate,
+      dateAdministered: vacDate,
       nextDueDate: vacNext || undefined
     };
     setPets(pets.map(p => p.id === selectedPetId ? { ...p, vaccines: [...(p.vaccines || []), newVac] } : p));
@@ -94,7 +96,7 @@ export const PetScreen: React.FC<PetScreenProps> = ({ onBack }) => {
   const handleSaveWeight = () => {
     if (!weightVal || !weightDate || !selectedPetId) return;
     const newEntry: WeightEntry = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       date: weightDate,
       weight: parseFloat(weightVal)
     };
@@ -120,7 +122,7 @@ export const PetScreen: React.FC<PetScreenProps> = ({ onBack }) => {
     if (view === 'form' && selectedPetId) {
       setPets(pets.map(p => p.id === selectedPetId ? { ...p, name, type, breed, birthDate, microchip } : p));
     } else {
-      const newPet: Pet = { id: Date.now().toString(), name, type, breed, birthDate, microchip, weightHistory: [], vaccines: [] };
+      const newPet: Pet = { id: uuidv4(), name, type, breed, birthDate, microchip, weightHistory: [], vaccines: [] };
       setPets([...pets, newPet]);
     }
     setView('list');
@@ -191,7 +193,7 @@ export const PetScreen: React.FC<PetScreenProps> = ({ onBack }) => {
                 <div key={idx} className="flex items-center justify-between p-3 bg-white/40 rounded-xl border border-white/50">
                   <div>
                     <p className="font-bold text-slate-800 text-xs">{vac.name}</p>
-                    <p className="text-[10px] text-slate-500">{new Date(vac.date).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-slate-500">{new Date(vac.dateAdministered).toLocaleDateString()}</p>
                   </div>
                   {vac.nextDueDate && (
                     <div className="text-right">

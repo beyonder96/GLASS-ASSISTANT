@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ChevronLeft, Building2, Pencil, Save, X, Plus, StickyNote, Trash2, Edit3, MessageSquare
 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { GlassCard } from './GlassCard';
 import { useData } from '../contexts/DataContext';
 import { ApeNote, ConstructionPhase } from '../types';
@@ -35,7 +36,7 @@ export const ApeScreen: React.FC<ApeScreenProps> = ({ onBack }) => {
     setIsUpdating(true);
     const newStatus = tempProgress === 100 ? 'completed' : tempProgress > 0 ? 'active' : 'pending';
     if (apePhases.length === 0) {
-      setApePhases([{ id: 'total', name: 'Geral', progress: tempProgress, status: newStatus }]);
+      setApePhases([{ id: uuidv4(), name: 'Geral', progress: tempProgress, status: newStatus }]);
     } else {
       setApePhases(apePhases.map((p, i) => i === 0 ? { ...p, progress: tempProgress, status: newStatus } : p));
     }
@@ -47,7 +48,7 @@ export const ApeScreen: React.FC<ApeScreenProps> = ({ onBack }) => {
     if (editingNote) {
       setApeNotes(apeNotes.map(n => n.id === editingNote.id ? { ...n, title: noteTitle, content: noteContent } : n));
     } else {
-      setApeNotes([{ id: Date.now().toString(), title: noteTitle, content: noteContent }, ...apeNotes]);
+      setApeNotes([{ id: uuidv4(), title: noteTitle, content: noteContent }, ...apeNotes]);
     }
     closeNoteModal();
   };

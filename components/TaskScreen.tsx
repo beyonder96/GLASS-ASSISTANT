@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { ChevronLeft, Plus, Trash2, CheckCircle2, Circle, ListTodo, Calendar, X, FileText, Save, StickyNote } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { Task } from '../types';
 import { GlassCard } from './GlassCard';
 import { useData } from '../contexts/DataContext';
@@ -50,7 +51,7 @@ export const TaskScreen: React.FC<TaskScreenProps> = ({ onBack }) => {
   const handleAdd = () => {
     if (!newTask.trim()) return;
     const task: Task = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       title: newTask,
       completed: false
     };

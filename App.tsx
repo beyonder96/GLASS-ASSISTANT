@@ -108,9 +108,12 @@ const App: React.FC = () => {
       }
     };
 
+    const content = getContent();
+    if (!content && !isEditingLayout && isVisible) return null;
+
     return (
       <div key={widget.id} className={`${spanClass} ${heightClass} ${commonClass}`}>
-        {getContent()}
+        {content}
 
         {isEditingLayout && (
           <div className="absolute -top-3 -right-3 z-50 flex gap-1 animate-in zoom-in duration-300">

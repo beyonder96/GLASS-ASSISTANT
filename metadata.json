@@ -1,9 +1,0 @@
-{
-  "requestFramePermissions": [
-    "camera",
-    "microphone",
-    "geolocation"
-  ],
-  "name": "Glass Assistant",
-  "description": ""
-}

@@ -6,6 +6,7 @@ import {
     Check, Trash, Store, Calculator, Scale, Hash,
     DollarSign, FileText, X, Minus, History, Save
 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { ShoppingItem, CartItem } from '../types';
 import { GlassCard } from './GlassCard';
 import { useData } from '../contexts/DataContext';
@@ -37,7 +38,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({ onBack }) => {
     // Lógica de Planejamento
     const handleAddToList = () => {
         if (!newItemName.trim()) return;
-        const item: ShoppingItem = { id: Date.now().toString(), name: newItemName, completed: false };
+        const item: ShoppingItem = { id: uuidv4(), name: newItemName, completed: false };
         setListItems(prev => [item, ...prev]);
         setNewItemName('');
     };
@@ -54,7 +55,7 @@ export const ShoppingScreen: React.FC<ShoppingScreenProps> = ({ onBack }) => {
         const price = parseFloat(cartPrice.replace(',', '.'));
 
         const newItem: CartItem = {
-            id: Date.now().toString(),
+            id: uuidv4(),
             name: cartName,
             quantity: qty,
             unitPrice: price,

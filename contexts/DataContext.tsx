@@ -173,7 +173,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })),
         fetchData('transactions', setTransactionsState, t => ({
           id: t.id, description: t.description, amount: Number(t.amount), type: t.type, date: t.date, accountId: t.account_id, cardId: t.card_id, category: t.category
-        }))
+        })),
+        fetchData('ape_phases', setApePhasesState, p => ({ id: p.id, name: p.name, status: p.status, progress: Number(p.progress) })),
+        fetchData('ape_notes', setApeNotesState, n => ({ id: n.id, title: n.title, content: n.content }))
       ]);
 
       setSyncStatus('synced');
@@ -369,17 +371,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [pets, isLoaded, user, upsertData]);
 
-  // 5. Sync Others (Local Only or Less Frequent)
+  // 5. Sync Meu Apê
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('ape_phases', JSON.stringify(apePhases));
+    if (user && !isInitialLoad.current && apePhases.length > 0) {
+      upsertData('ape_phases', apePhases.map(p => ({ id: p.id, name: p.name, status: p.status, progress: p.progress })));
+    }
+  }, [apePhases, isLoaded, user, upsertData]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('ape_notes', JSON.stringify(apeNotes));
+    if (user && !isInitialLoad.current && apeNotes.length > 0) {
+      const timer = setTimeout(() => {
+        upsertData('ape_notes', apeNotes.map(n => ({ id: n.id, title: n.title, content: n.content })));
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [apeNotes, isLoaded, user, upsertData]);
+
+  // 6. Sync Others (Local Only or Less Frequent)
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('ape_phases', JSON.stringify(apePhases));
-      localStorage.setItem('ape_notes', JSON.stringify(apeNotes));
       localStorage.setItem('glass_dashboard_layout', JSON.stringify(dashboardLayout));
       localStorage.setItem('glass_budgets', JSON.stringify(budgets));
       localStorage.setItem('glass_memory', JSON.stringify(memory));
       if (profileImage) localStorage.setItem('glass_profile_image', JSON.stringify(profileImage));
     }
-  }, [apePhases, apeNotes, dashboardLayout, memory, profileImage, isLoaded]);
+  }, [dashboardLayout, memory, profileImage, isLoaded]);
 
   // --- BUDGET LOGIC ---
   const addBudget = (budget: Budget) => {
