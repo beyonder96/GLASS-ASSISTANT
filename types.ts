@@ -131,5 +131,21 @@ export interface MusicTrack {
   url?: string;
 }
 
+export interface Goal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline?: string;
+  icon?: string;
+  color?: string;
+}
+
+export interface ReportData {
+  name: string;
+  value: number;
+  color?: string;
+}
+
 export type PersonaId = 'aura';
 export type VoiceId = 'Sulafat';

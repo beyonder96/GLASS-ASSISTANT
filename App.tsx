@@ -13,7 +13,7 @@ import {
   MusicWidget,
   ApeWidget
 } from './components/Widgets';
-import { FinanceScreen } from './components/FinanceScreen';
+import { FinancialHub } from './components/Finance/FinancialHub';
 import { TaskScreen } from './components/TaskScreen';
 import { ShoppingScreen } from './components/ShoppingScreen';
 import { PetScreen } from './components/PetScreen';
@@ -146,7 +146,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (currentView) {
-      case 'finance': return <FinanceScreen onBack={() => setCurrentView('dashboard')} />;
+      case 'finance': return <FinancialHub onBack={() => setCurrentView('dashboard')} />;
       case 'tasks': return <TaskScreen onBack={() => setCurrentView('dashboard')} />;
       case 'shopping': return <ShoppingScreen onBack={() => setCurrentView('dashboard')} />;
       case 'pets': return <PetScreen onBack={() => setCurrentView('dashboard')} />;
